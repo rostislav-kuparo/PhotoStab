@@ -1,0 +1,60 @@
+[package]
+name = "photostab"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+axum = { version = "0.8.9", features = ["multipart"] }
+bytemuck = { version = "1.25.2", features = ["derive"] }
+futures = "0.3.34"
+half = "2.7.1"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg"] }
+jpeg-encoder = { version = "0.7.1", default-features = false, features = ["simd"] }
+mime_guess = "2.0.5"
+ort = { version = "2.0.0-rc.14", features = ["directml", "half"] }
+pollster = { version = "1.0.1", default-features = false }
+prost = "0.14"
+raw-window-handle = "0.6"
+rawler = { version = "0.8.0", default-features = false }
+rayon = "1.12.0"
+rfd = "0.17.2"
+rust-embed = "8.13.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tao = "0.37.1"
+tokio = { version = "1.53.3", features = ["full"] }
+tokio-stream = { version = "0.1.19", features = ["sync"] }
+tower-http = { version = "0.7.1", features = ["fs", "cors"] }
+tract-onnx = "0.23.9"
+uuid = { version = "1.28.0", features = ["v4"] }
+wgpu = "30.0.1"
+windows-sys = { version = "0.61.2", features = ["Win32_System_Console", "Win32_UI_WindowsAndMessaging"] }
+wry = "0.57.0"
+
+[features]
+# Установщик: `PhotoStab-Setup.exe` со сборкой из dist\PhotoStab внутри (см. make-installer.ps1).
+setup = []
+
+[[bin]]
+name = "photostab"
+path = "src/main.rs"
+
+[[bin]]
+name = "photostab-setup"
+path = "src/setup.rs"
+required-features = ["setup"]
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+codegen-units = 4
+
+[build-dependencies]
+embed-resource = "3.0.12"
+

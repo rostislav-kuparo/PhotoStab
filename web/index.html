@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhotoStab</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='7' width='26' height='19' rx='4' fill='%23888'/%3E%3Ccircle cx='16' cy='16.5' r='6' fill='%23333'/%3E%3Ccircle cx='16' cy='16.5' r='3.5' fill='%23aaa'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 📁 Проекты: открыть папку и история -->
+<section id="view-projects" class="view projects">
+  <div class="projects-col">
+    <div class="card open-card">
+      <div class="open-icon" data-icon="folder"></div>
+      <h1>Открыть съёмку</h1>
+      <p>Папка с RAW — файлы останутся на месте. Можно и просто перетащить RAW-файлы в окно.</p>
+      <button id="btn-open" class="btn primary big">Выбрать папку…</button>
+      <div class="path-row">
+        <input id="path-input" type="text" placeholder="или вставьте путь, например E:\Съёмки\2025-03-29">
+        <button id="btn-path" class="btn">Открыть</button>
+      </div>
+    </div>
+    <div class="card recent-card">
+      <div class="card-title">Недавние проекты</div>
+      <div id="history" class="history"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 👁 Отбор: что выбрал алгоритм, правка отбора до обработки -->
+<section id="view-cull" class="view hidden">
+  <header class="bar">
+    <div class="pill status-pill">
+      <div class="status-lines"><span class="st-folder"></span><span class="st-text"></span></div>
+      <div class="bar-line"><div class="bar-fill"></div></div>
+    </div>
+    <div class="pill seg" id="cull-filter">
+      <button data-f="all" class="on">Все <span></span></button>
+      <button data-f="picked"><i data-icon="star-fill"></i> Отобранные <span></span></button>
+      <button data-f="rejected">Отбракованные <span></span></button>
+    </div>
+    <div class="spacer"></div>
+    <div class="pill seg sizes"></div>
+    <button class="pill pill-btn primary" id="to-process">К обработке <i data-icon="arrow"></i></button>
+  </header>
+  <div class="scroll"><div id="cull-grid" class="grid"></div></div>
+  <div class="analysis hidden" id="analysis">
+    <div class="card analysis-card">
+      <div class="an-title">Разбираю съёмку</div>
+      <div class="an-bar"><div class="an-fill" id="an-fill"></div></div>
+      <div class="an-count" id="an-count"></div>
+      <div class="an-hint">лица и глаза, свет, резкость, серии — отбор появится, когда всё будет готово</div>
+    </div>
+  </div>
+</section>
+
+<!-- 🖼 Обработка: отобранные кадры, группы света, правки, экспорт -->
+<section id="view-process" class="view hidden">
+  <header class="bar">
+    <div class="pill status-pill">
+      <div class="status-lines"><span class="st-folder"></span><span class="st-text"></span></div>
+      <div class="bar-line"><div class="bar-fill"></div></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="pill seg sizes"></div>
+    <button class="pill pill-btn primary" id="btn-export" disabled><i data-icon="export"></i> Экспорт…</button>
+  </header>
+  <div class="body">
+    <aside class="card side">
+      <div class="card-title">Группы освещения</div>
+      <div id="groups"></div>
+    </aside>
+    <div class="scroll"><div id="grid" class="grid"></div></div>
+  </div>
+</section>
+
+<!-- Навигация: пилюля слева снизу -->
+<nav class="pill nav" id="nav">
+  <button data-view="projects" title="Проекты (1)"><i data-icon="folder"></i></button>
+  <button data-view="cull" title="Отбор (2)"><i data-icon="eye"></i></button>
+  <button data-view="process" title="Обработка (3)"><i data-icon="image"></i><span class="badge" id="nav-badge"></span></button>
+</nav>
+
+<div id="viewer" class="viewer hidden">
+  <div class="stage-col">
+    <div class="stage" id="stage">
+      <div class="panes" id="panes"></div>
+      <svg class="ruler-layer hidden" id="ruler-layer"></svg>
+      <div class="busy hidden" id="busy"></div>
+      <button class="arrow prev" id="prev" title="Предыдущий (A, ←)"><i data-icon="left"></i></button>
+      <button class="arrow next" id="next" title="Следующий (D, →)"><i data-icon="right"></i></button>
+      <div class="pill tools" id="tools">
+        <div class="seg proc-only" id="cmp-mode">
+          <button data-mode="slider" title="Шторка (B — переключить вид)"><i data-icon="cmp-slider"></i></button>
+          <button data-mode="side" title="Рядом: слева исходник, справа обработка"><i data-icon="cmp-side"></i></button>
+          <button data-mode="off" title="Без сравнения"><i data-icon="cmp-off"></i></button>
+        </div>
+        <div class="seg proc-only" id="cmp-src">
+          <button data-src="camera" title="Сравнивать с JPEG камеры">Камера</button>
+          <button data-src="nonr" title="Сравнивать с тем же кадром без шумодава">Без шумодава</button>
+        </div>
+        <span class="sep proc-only"></span>
+        <button class="tool" id="z-fit" title="Вписать (Z)"><i data-icon="fit"></i></button>
+        <button class="tool z-label" id="z-100" title="100% (Z)">100%</button>
+      </div>
+      <div class="pill tools-r" id="tools-r">
+        <button class="tool" id="t-strip" title="Показать или скрыть ленту кадров (F)"><i data-icon="strip"></i></button>
+        <button class="tool" id="t-panel" title="Показать или скрыть инспектор (I)"><i data-icon="panel"></i></button>
+        <button class="tool hidden" id="t-close" title="Закрыть просмотр (Esc)"><i data-icon="close"></i></button>
+      </div>
+    </div>
+    <div class="card strip" id="strip">
+      <div class="strip-count" id="strip-count"></div>
+      <div class="strip-items" id="strip-items"></div>
+    </div>
+  </div>
+  <aside class="card panel">
+    <div class="panel-head">
+      <button class="star-btn" id="v-pick" title="Отобрать (P)"><i data-icon="star"></i></button>
+      <div class="titles">
+        <div class="v-name" id="v-name"></div>
+        <div class="v-meta" id="v-meta"></div>
+      </div>
+      <button class="icon-btn" id="v-close" title="Закрыть (Esc)"><i data-icon="close"></i></button>
+    </div>
+    <div class="reasons" id="v-reasons"></div>
+
+    <div id="cull-block" class="hidden">
+      <button class="btn primary wide" id="v-to-process">Перейти к обработке <i data-icon="arrow"></i></button>
+      <div class="keys"><kbd>A</kbd> <kbd>D</kbd> листать · <kbd>S</kbd> отбор · <kbd>Enter</kbd> к обработке<br><kbd>F</kbd> лента · <kbd>I</kbd> инспектор · <kbd>Z</kbd> 100%<br>колесо — масштаб, зажатая кнопка мыши — перемещение</div>
+    </div>
+
+    <div id="edit-blocks">
+      <div class="block">
+        <div class="block-title" id="g-title">Свет группы</div>
+        <div class="slider"><div class="sl-head">Температура <span><b class="scrub" id="g-temp-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="g-temp" title="Вернуть значение программы">↺</button></span></div><input type="range" id="g-temp" min="2000" max="10000" step="10"></div>
+        <div class="slider"><div class="sl-head">Оттенок <span><b class="scrub" id="g-tint-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="g-tint" title="Вернуть значение программы">↺</button></span></div><input type="range" id="g-tint" min="-60" max="60" step="0.5"></div>
+        <div class="slider"><div class="sl-head">Экспозиция группы <span><b class="scrub" id="g-exp-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="g-exp" title="Вернуть значение программы">↺</button></span></div><input type="range" id="g-exp" min="-2" max="2" step="0.05"></div>
+        <div class="sub-title">Тон и цвет места</div>
+        <div class="slider"><div class="sl-head">Контраст <span><b class="scrub" id="g-con-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="g-con" title="Вернуть значение программы">↺</button></span></div><input type="range" id="g-con" min="-100" max="100" step="1"></div>
+        <div class="slider"><div class="sl-head">Света <span><b class="scrub" id="g-hi-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="g-hi" title="Вернуть значение программы">↺</button></span></div><input type="range" id="g-hi" min="-100" max="100" step="1"></div>
+        <div class="slider"><div class="sl-head">Тени <span><b class="scrub" id="g-sh-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="g-sh" title="Вернуть значение программы">↺</button></span></div><input type="range" id="g-sh" min="-100" max="100" step="1"></div>
+        <div class="slider"><div class="sl-head">Насыщенность <span><b class="scrub" id="g-sat-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="g-sat" title="Вернуть значение программы">↺</button></span></div><input type="range" id="g-sat" min="-100" max="100" step="1"></div>
+        <div class="slider"><div class="sl-head">Резкость <span><b class="scrub" id="g-shp-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="g-shp" title="Вернуть значение программы">↺</button></span></div><input type="range" id="g-shp" min="0" max="100" step="1"></div>
+        <div class="sub-title"><label class="check"><input type="checkbox" id="g-nr"> ИИ-шумодав (NAFNet)</label></div>
+        <div class="slider"><div class="sl-head">Яркостный шум <span><b class="scrub" id="g-nrl-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="g-nrl" title="Вернуть значение программы">↺</button></span></div><input type="range" id="g-nrl" min="0" max="100" step="1"></div>
+        <div class="slider"><div class="sl-head">Цветовой шум <span><b class="scrub" id="g-nrc-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="g-nrc" title="Вернуть значение программы">↺</button></span></div><input type="range" id="g-nrc" min="0" max="100" step="1"></div>
+        <button class="btn small" id="g-reset">Всё авто для группы</button>
+      </div>
+
+      <div class="block">
+        <div class="block-title">Этот кадр</div>
+        <div class="slider"><div class="sl-head">Экспозиция кадра <span><b class="scrub" id="p-exp-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="p-exp" title="Вернуть значение программы">↺</button></span></div><input type="range" id="p-exp" min="-2" max="2" step="0.05"></div>
+        <div class="slider"><div class="sl-head">Восстановление светов <span><b class="scrub" id="p-rec-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="p-rec" title="Вернуть значение программы">↺</button></span></div><input type="range" id="p-rec" min="0" max="100" step="1"></div>
+        <div class="slider"><div class="sl-head">Горизонт <span><b class="scrub" id="p-angle-v" title="Тяните вправо-влево · Shift — точнее · клик — ввести число · двойной клик — значение программы"></b><button class="rst" data-rst="p-angle" title="Вернуть значение программы">↺</button></span></div><input type="range" id="p-angle" min="-10" max="10" step="0.05"></div>
+        <button class="btn small ruler-btn" id="ruler-btn" title="Проведите на фото линию вдоль того, что должно быть ровным: пол, стол, рама, колонна"><i data-icon="ruler"></i> Выровнять линейкой <kbd>R</kbd></button>
+        <label class="check"><input type="checkbox" id="p-skin"> Коррекция тона кожи</label>
+        <button class="btn small" id="p-reset">Всё авто для кадра</button>
+      </div>
+    </div>
+    <div class="info" id="v-info"></div>
+  </aside>
+</div>
+
+<div id="export-dlg" class="modal hidden">
+  <div class="card modal-card">
+    <h2>Экспорт JPEG</h2>
+    <label class="check"><input type="checkbox" id="x-picked" checked> Только отобранные <span id="x-picked-n"></span></label>
+    <div class="form-row"><label>Качество</label>
+      <select id="x-quality"><option value="95">95 — максимум</option><option value="92" selected>92 — стандарт</option><option value="85">85 — компактно</option></select></div>
+    <div class="form-row"><label>Размер</label>
+      <select id="x-size"><option value="0" selected>Полный (24 Мп)</option><option value="3000">3000 px по длинной стороне</option><option value="2048">2048 px — для соцсетей</option></select></div>
+    <div class="form-row"><label>Папка</label><input id="x-dir" type="text"></div>
+    <div class="form-hint" id="x-names"></div>
+    <div class="modal-actions">
+      <button class="btn" id="x-cancel">Отмена</button>
+      <button class="btn primary" id="x-go">Экспортировать</button>
+    </div>
+  </div>
+</div>
+
+<div id="drop-overlay" class="drop-overlay hidden"><div>Отпустите, чтобы загрузить RAW</div></div>
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>
